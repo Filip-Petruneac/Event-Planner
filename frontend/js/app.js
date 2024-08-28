@@ -25,18 +25,28 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 
-// Function to load events
+// Function to format date and time
+function formatDateTime(date, time) {
+    const dateTimeString = `${date}T${time}`;
+    const dateTime = new Date(dateTimeString);
+    return dateTime.toISOString(); // Example format: '2024-08-28T14:30:00.000Z'
+}
+
+// Example of logging events to check structure
 function loadEvents() {
     fetch(apiUrl)
         .then(response => response.json())
         .then(events => {
+            console.log("Loaded events:", events); // Log the events
             const eventList = document.getElementById('eventList');
             eventList.innerHTML = '';
             events.forEach(event => {
                 const li = document.createElement('li');
                 li.textContent = `${event.name} - ${event.date} - ${event.location}`;
                 
+                // Add a click event listener to each list item
                 li.addEventListener('click', () => {
+                    console.log(`Redirecting to event.html?id=${event.id}`); // Log the event ID
                     window.location.href = `event.html?id=${event.id}`;
                 });
 
@@ -88,22 +98,28 @@ function createEvent() {
     });
 }
 
-// Function to show create event form
-function showCreateEventForm() {
-    document.getElementById('create-event-form').style.display = 'block';
-}
-
-// Function to hide create event form
-function hideCreateEventForm() {
-    document.getElementById('create-event-form').style.display = 'none';
-}
-
-// Function to submit RSVP
 function submitRSVP() {
+    // Get event ID from URL
     const urlParams = new URLSearchParams(window.location.search);
     const eventId = urlParams.get('id');
-    const rsvpValue = document.querySelector('input[name="rsvp"]:checked').value;
 
+    // Check if eventId is valid
+    if (!eventId) {
+        console.error('Event ID is missing in URL');
+        return;
+    }
+
+    // Get the selected RSVP value
+    const selectedRadio = document.querySelector('input[name="rsvp"]:checked');
+    if (!selectedRadio) {
+        console.error('No RSVP option selected');
+        return;
+    }
+    const rsvpValue = selectedRadio.value;
+
+    console.log(`Submitting RSVP for event ID: ${eventId}`); // Added logging for debugging
+
+    // Send RSVP to server
     fetch(`http://localhost:8001/events/${eventId}/rsvp`, {
         method: 'POST',
         headers: {
@@ -128,6 +144,7 @@ function submitRSVP() {
 // Function to load event details
 function loadEventDetails(eventId) {
     console.log(`Loading details for event ID: ${eventId}`);
+
     fetch(`http://localhost:8001/events/${eventId}`)
         .then(response => response.json())
         .then(event => {
@@ -146,4 +163,14 @@ function loadEventDetails(eventId) {
             });
         })
         .catch(error => console.error('Error fetching event details:', error));
+}
+
+// Function to show create event form
+function showCreateEventForm() {
+    document.getElementById('create-event-form').style.display = 'block';
+}
+
+// Function to hide create event form
+function hideCreateEventForm() {
+    document.getElementById('create-event-form').style.display = 'none';
 }

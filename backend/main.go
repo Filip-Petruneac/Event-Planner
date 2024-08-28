@@ -18,7 +18,6 @@ import (
 var db *gorm.DB
 
 // Event model
-// Event model
 type Event struct {
     ID          uint       `gorm:"primaryKey"`
     Name        string     `json:"name"`
@@ -95,26 +94,27 @@ func GetEvents(w http.ResponseWriter, r *http.Request) {
 // GetEvent retrieves an event by its ID
 func GetEvent(w http.ResponseWriter, r *http.Request) {
     params := mux.Vars(r)
-    eventID := params["id"]
+    eventIDStr := params["id"]
 
-    log.Printf("Extracted event ID: %s", eventID) // Debugging log
+    log.Printf("Extracted event ID string: %s", eventIDStr) // Debugging log
 
-    if eventID == "" {
-        http.Error(w, "Event ID is required", http.StatusBadRequest)
+    // Convert event ID string to a uint
+    eventID, err := strconv.ParseUint(eventIDStr, 10, 32)
+    if err != nil {
+        log.Printf("Invalid event ID: %s", eventIDStr)
+        http.Error(w, "Invalid event ID", http.StatusBadRequest)
         return
     }
 
     var event Event
     if err := db.Preload("RSVPs").First(&event, eventID).Error; err != nil {
-        log.Printf("Error fetching event with ID %s: %v", eventID, err)
+        log.Printf("Error fetching event with ID %d: %v", eventID, err)
         http.Error(w, "Event not found", http.StatusNotFound)
         return
     }
 
     json.NewEncoder(w).Encode(event)
 }
-
-
 
 func UpdateEvent(w http.ResponseWriter, r *http.Request) {
     params := mux.Vars(r)

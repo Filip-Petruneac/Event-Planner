@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Event Planner</title>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <header>
+        <h1>Event Planner</h1>
+        <button onclick="showCreateEventForm()">Create New Event</button>
+    </header>
+
+    <main>
+        <section id="create-event-form" style="display:none;">
+            <h2>Create Event</h2>
+            <form id="eventForm">
+                <label for="name">Event Name:</label>
+                <input type="text" id="name" required>
+
+                <label for="date">Date:</label>
+                <input type="date" id="date" required>
+
+                <label for="time">Time:</label>
+                <input type="time" id="time" required>
+
+                <label for="location">Location:</label>
+                <input type="text" id="location" required>
+
+                <label for="description">Description:</label>
+                <textarea id="description" required></textarea>
+
+                <button type="submit">Save Event</button>
+                <button type="button" onclick="hideCreateEventForm()">Cancel</button>
+            </form>
+        </section>
+
+        <section id="events-list">
+            <h2>All Events</h2>
+            <ul id="eventList"></ul>
+        </section>
+    </main>
+
+    <script src="js/app.js"></script>
+</body>
+</html>

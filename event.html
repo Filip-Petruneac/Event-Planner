@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Event Details</title>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <header>
+        <h1>Event Details</h1>
+    </header>
+
+    <main>
+        <section id="event-details">
+            <h2 id="eventName"></h2>
+            <p id="eventDate"></p>
+            <p id="eventTime"></p>
+            <p id="eventLocation"></p>
+            <p id="eventDescription"></p>
+
+            <h3>RSVP</h3>
+            <form id="rsvpForm">
+                <input type="radio" name="rsvp" value="accepted" id="accept">
+                <label for="accept">Accept</label><br>
+                <input type="radio" name="rsvp" value="declined" id="decline">
+                <label for="decline">Decline</label><br>
+                <button type="submit">Submit RSVP</button>
+            </form>
+
+            <h3>Attendees</h3>
+            <ul id="attendeesList"></ul>
+        </section>
+    </main>
+
+    <script src="js/app.js"></script>
+</body>
+</html>

@@ -3,7 +3,6 @@ package main
 import (
     "encoding/json"
     "html/template"
-    "log"
     "net/http"
     "os"
     "strconv"
@@ -14,9 +13,25 @@ import (
     "github.com/rs/cors"
     "gorm.io/driver/sqlite"
     "gorm.io/gorm"
+    "github.com/sirupsen/logrus"
 )
 
-var db *gorm.DB
+// DB struct to encapsulate the database connection
+type DB struct {
+    *gorm.DB
+}
+
+// Logger struct to encapsulate the logger
+type Logger struct {
+    *logrus.Logger
+}
+
+// App struct to encapsulate dependencies
+type App struct {
+    DB     *DB
+    Logger *Logger
+}
+
 var templates *template.Template
 
 // Event model
@@ -39,13 +54,14 @@ type RSVP struct {
 }
 
 // Initialize the database
-func InitDB() {
-    var err error
-    db, err = gorm.Open(sqlite.Open("events.db"), &gorm.Config{})
+func InitDB() *DB {
+    dbConn, err := gorm.Open(sqlite.Open("events.db"), &gorm.Config{})
     if err != nil {
-        log.Fatal("Failed to connect to database", err)
+        logrus.Fatal("Failed to connect to database", err)
     }
+    db := &DB{DB: dbConn}
     db.AutoMigrate(&Event{}, &RSVP{})
+    return db
 }
 
 // Load templates
@@ -56,20 +72,23 @@ func LoadTemplates() {
 // API Handlers
 
 // CreateEvent handles POST requests to create a new event
-func CreateEvent(w http.ResponseWriter, r *http.Request) {
+func (app *App) CreateEvent(w http.ResponseWriter, r *http.Request) {
     var event Event
 
     if err := json.NewDecoder(r.Body).Decode(&event); err != nil {
+        app.Logger.Errorf("CreateEvent: Invalid input - %v", err)
         http.Error(w, "Invalid input", http.StatusBadRequest)
         return
     }
 
     if event.Date.IsZero() {
+        app.Logger.Warn("CreateEvent: Invalid date")
         http.Error(w, "Invalid date", http.StatusBadRequest)
         return
     }
 
-    if err := db.Create(&event).Error; err != nil {
+    if err := app.DB.Create(&event).Error; err != nil {
+        app.Logger.Errorf("CreateEvent: Failed to create event - %v", err)
         http.Error(w, "Failed to create event", http.StatusInternalServerError)
         return
     }
@@ -79,35 +98,37 @@ func CreateEvent(w http.ResponseWriter, r *http.Request) {
 }
 
 // GetEvents handles GET requests to retrieve events
-func GetEvents(w http.ResponseWriter, r *http.Request) {
+func (app *App) GetEvents(w http.ResponseWriter, r *http.Request) {
     filter := r.URL.Query().Get("filter")
     var events []Event
 
     switch filter {
     case "upcoming":
-        db.Preload("RSVPs").Where("date >= ?", time.Now()).Find(&events)
+        app.DB.Preload("RSVPs").Where("date >= ?", time.Now()).Find(&events)
     case "past":
-        db.Preload("RSVPs").Where("date < ?", time.Now()).Find(&events)
+        app.DB.Preload("RSVPs").Where("date < ?", time.Now()).Find(&events)
     default:
-        db.Preload("RSVPs").Find(&events)
+        app.DB.Preload("RSVPs").Find(&events)
     }
 
     json.NewEncoder(w).Encode(events)
 }
 
 // GetEvent retrieves an event by its ID
-func GetEvent(w http.ResponseWriter, r *http.Request) {
+func (app *App) GetEvent(w http.ResponseWriter, r *http.Request) {
     params := mux.Vars(r)
     eventIDStr := params["id"]
 
     eventID, err := strconv.ParseUint(eventIDStr, 10, 32)
     if err != nil {
+        app.Logger.Errorf("GetEvent: Invalid event ID - %v", err)
         http.Error(w, "Invalid event ID", http.StatusBadRequest)
         return
     }
 
     var event Event
-    if err := db.Preload("RSVPs").First(&event, eventID).Error; err != nil {
+    if err := app.DB.Preload("RSVPs").First(&event, eventID).Error; err != nil {
+        app.Logger.Errorf("GetEvent: Event not found - %v", err)
         http.Error(w, "Event not found", http.StatusNotFound)
         return
     }
@@ -115,15 +136,18 @@ func GetEvent(w http.ResponseWriter, r *http.Request) {
     json.NewEncoder(w).Encode(event)
 }
 
-func UpdateEvent(w http.ResponseWriter, r *http.Request) {
+// UpdateEvent updates an event by its ID
+func (app *App) UpdateEvent(w http.ResponseWriter, r *http.Request) {
     params := mux.Vars(r)
     var event Event
-    if err := db.First(&event, params["id"]).Error; err != nil {
+    if err := app.DB.First(&event, params["id"]).Error; err != nil {
+        app.Logger.Errorf("UpdateEvent: Event not found - %v", err)
         http.Error(w, "Event not found", http.StatusNotFound)
         return
     }
     var updatedEvent Event
     if err := json.NewDecoder(r.Body).Decode(&updatedEvent); err != nil {
+        app.Logger.Errorf("UpdateEvent: Invalid input - %v", err)
         http.Error(w, "Invalid input", http.StatusBadRequest)
         return
     }
@@ -133,89 +157,99 @@ func UpdateEvent(w http.ResponseWriter, r *http.Request) {
     event.Time = updatedEvent.Time
     event.Location = updatedEvent.Location
     event.Description = updatedEvent.Description
-    db.Save(&event)
+    app.DB.Save(&event)
     json.NewEncoder(w).Encode(event)
 }
 
-func DeleteEvent(w http.ResponseWriter, r *http.Request) {
+// DeleteEvent deletes an event by its ID
+func (app *App) DeleteEvent(w http.ResponseWriter, r *http.Request) {
     params := mux.Vars(r)
     var event Event
-    if err := db.Delete(&event, params["id"]).Error; err != nil {
+    if err := app.DB.Delete(&event, params["id"]).Error; err != nil {
+        app.Logger.Errorf("DeleteEvent: Event not found - %v", err)
         http.Error(w, "Event not found", http.StatusNotFound)
         return
     }
     json.NewEncoder(w).Encode("Event deleted")
 }
 
-func RSVPEvent(w http.ResponseWriter, r *http.Request) {
+// RSVPEvent handles RSVPs for events
+func (app *App) RSVPEvent(w http.ResponseWriter, r *http.Request) {
     params := mux.Vars(r)
     var rsvp RSVP
     err := json.NewDecoder(r.Body).Decode(&rsvp)
     if err != nil || (rsvp.Response != "accepted" && rsvp.Response != "declined") {
+        app.Logger.Errorf("RSVPEvent: Invalid input - %v", err)
         http.Error(w, "Invalid input", http.StatusBadRequest)
         return
     }
 
     eventID, err := strconv.ParseUint(params["id"], 10, 32)
     if err != nil {
+        app.Logger.Errorf("RSVPEvent: Invalid event ID - %v", err)
         http.Error(w, "Invalid event ID", http.StatusBadRequest)
         return
     }
     rsvp.EventID = uint(eventID)
 
-    db.Create(&rsvp)
+    app.DB.Create(&rsvp)
     json.NewEncoder(w).Encode(rsvp)
 }
 
 // Page Handlers
 
-// Render the main event list page
-func RenderIndex(w http.ResponseWriter, r *http.Request) {
+// RenderIndex renders the main event list page
+func (app *App) RenderIndex(w http.ResponseWriter, r *http.Request) {
     var events []Event
-    db.Find(&events)
+    app.DB.Find(&events)
     err := templates.ExecuteTemplate(w, "index.html", events)
     if err != nil {
+        app.Logger.Errorf("RenderIndex: %v", err)
         http.Error(w, err.Error(), http.StatusInternalServerError)
     }
 }
 
-func RenderEvent(w http.ResponseWriter, r *http.Request) {
+// RenderEvent renders a specific event page
+func (app *App) RenderEvent(w http.ResponseWriter, r *http.Request) {
     params := mux.Vars(r)
     eventIDStr := params["id"]
 
     eventID, err := strconv.ParseUint(eventIDStr, 10, 32)
     if err != nil {
+        app.Logger.Errorf("RenderEvent: Invalid event ID - %v", err)
         http.Error(w, "Invalid event ID", http.StatusBadRequest)
         return
     }
 
     var event Event
-    if err := db.Preload("RSVPs").First(&event, eventID).Error; err != nil {
+    if err := app.DB.Preload("RSVPs").First(&event, eventID).Error; err != nil {
+        app.Logger.Errorf("RenderEvent: Event not found - %v", err)
         http.Error(w, "Event not found", http.StatusNotFound)
         return
     }
 
     err = templates.ExecuteTemplate(w, "event.html", event)
     if err != nil {
+        app.Logger.Errorf("RenderEvent: %v", err)
         http.Error(w, err.Error(), http.StatusInternalServerError)
     }
 }
 
-// Set up the routes
-func InitializeRoutes() *mux.Router {
+// InitializeRoutes sets up the router with routes and handlers
+func InitializeRoutes(app *App) *mux.Router {
     router := mux.NewRouter()
 
     // API Routes
-    router.HandleFunc("/events", CreateEvent).Methods("POST")
-    router.HandleFunc("/events", GetEvents).Methods("GET")
-    router.HandleFunc("/events/{id}", GetEvent).Methods("GET")
-    router.HandleFunc("/events/{id}", UpdateEvent).Methods("PUT")
-    router.HandleFunc("/events/{id}", DeleteEvent).Methods("DELETE")
-    router.HandleFunc("/events/{id}/rsvp", RSVPEvent).Methods("POST")
+    router.HandleFunc("/events", app.CreateEvent).Methods("POST")
+    router.HandleFunc("/events", app.GetEvents).Methods("GET")
+    router.HandleFunc("/events/{id}", app.GetEvent).Methods("GET")
+    router.HandleFunc("/events/{id}", app.UpdateEvent).Methods("PUT")
+    router.HandleFunc("/events/{id}", app.DeleteEvent).Methods("DELETE")
+    router.HandleFunc("/events/{id}/rsvp", app.RSVPEvent).Methods("POST")
 
     // Frontend Routes
-    router.HandleFunc("/", RenderIndex).Methods("GET")
-    router.HandleFunc("/events/{id}", RenderEvent).Methods("GET")
+    router.HandleFunc("/", app.RenderIndex).Methods("GET")
+    router.HandleFunc("/events/{id}", app.RenderEvent).Methods("GET")
 
     // Static files
     router.PathPrefix("/static/").Handler(http.StripPrefix("/static/", http.FileServer(http.Dir("./static/"))))
@@ -226,12 +260,19 @@ func InitializeRoutes() *mux.Router {
 // Main function
 func main() {
     if err := godotenv.Load(); err != nil {
-        log.Print("No .env file found")
+        logrus.Print("No .env file found")
     }
 
-    InitDB()
+    // Initialize the logger
+    logger := &Logger{Logger: logrus.New()}
+    logger.SetFormatter(&logrus.TextFormatter{FullTimestamp: true})
+    logger.SetLevel(logrus.InfoLevel)
+
+    // Initialize the database
+    db := InitDB()
     LoadTemplates()
-    router := InitializeRoutes()
+    app := &App{DB: db, Logger: logger}
+    router := InitializeRoutes(app)
 
     c := cors.New(cors.Options{
         AllowedOrigins: []string{"*"},
@@ -245,6 +286,6 @@ func main() {
     if port == "" {
         port = "8001"
     }
-    log.Printf("Server is running on port %s", port)
-    log.Fatal(http.ListenAndServe(":"+port, handler))
+    logger.Infof("Server is running on port %s", port)
+    logger.Fatal(http.ListenAndServe(":"+port, handler))
 }

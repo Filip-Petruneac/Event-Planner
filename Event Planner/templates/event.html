@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{.Name}} - Event Details</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100">
+    <header class="bg-blue-600 text-white p-4">
+        <div class="container mx-auto flex justify-between items-center">
+            <h1 class="text-3xl font-bold">{{.Name}}</h1>
+            <a href="/" class="bg-white text-blue-600 font-bold py-2 px-4 rounded hover:bg-blue-100">Back to Events</a>
+        </div>
+    </header>
+    <main class="container mx-auto p-4">
+        <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+            <h2 class="text-2xl font-semibold mb-4">Event Details</h2>
+            <p class="mb-2"><strong>Date:</strong> {{.Date.Format "Jan 02, 2006"}}</p>
+            <p class="mb-2"><strong>Time:</strong> {{.Time}}</p>
+            <p class="mb-2"><strong>Location:</strong> {{.Location}}</p>
+            <p class="mb-2"><strong>Description:</strong> {{.Description}}</p>
+        </div>
+        
+        <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+            <h2 class="text-2xl font-semibold mb-4">RSVPs</h2>
+            <ul id="rsvp-list">
+                {{range .RSVPs}}
+                <li class="mb-2">
+                    User ID: {{.UserID}} - Response: <span class="font-semibold {{if eq .Response "accepted"}}text-green-600{{else}}text-red-600{{end}}">{{.Response}}</span>
+                </li>
+                {{else}}
+                <li>No RSVPs yet.</li>
+                {{end}}
+            </ul>
+        </div>
+
+        <div class="bg-white rounded-lg shadow-md p-6">
+            <h2 class="text-2xl font-semibold mb-4">RSVP to this event</h2>
+            <form id="new-rsvp-form" class="max-w-sm">
+                <input type="hidden" id="event-id" value="{{.ID}}">
+                <div class="mb-4">
+                    <label for="user-id" class="block text-gray-700 font-bold mb-2">User ID:</label>
+                    <input type="number" id="user-id" name="user-id" required class="w-full px-3 py-2 border rounded-lg">
+                </div>
+                <div class="mb-4">
+                    <label for="response" class="block text-gray-700 font-bold mb-2">Response:</label>
+                    <select id="response" name="response" required class="w-full px-3 py-2 border rounded-lg">
+                        <option value="accepted">Accept</option>
+                        <option value="declined">Decline</option>
+                    </select>
+                </div>
+                <button type="submit" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded">
+                    Submit RSVP
+                </button>
+            </form>
+        </div>
+    </main>
+    <script src="/static/js/main.js"></script>
+</body>
+</html>

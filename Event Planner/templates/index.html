@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Event Planner</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <header>
+        <h1>Event Planner</h1>
+    </header>
+    <main>
+        <section id="event-list">
+            <h2>Events</h2>
+            <ul>
+                {{range .}}
+                <li>
+                    <a href="/events/{{.ID}}">
+                        <h3>{{.Name}}</h3>
+                        <p>Date: {{.Date.Format "Jan 02, 2006"}}</p>
+                        <p>Location: {{.Location}}</p>
+                    </a>
+                </li>
+                {{else}}
+                <li>No events found.</li>
+                {{end}}
+            </ul>
+        </section>
+        <section id="create-event">
+            <h2>Create New Event</h2>
+            <form id="new-event-form">
+                <label for="name">Event Name:</label>
+                <input type="text" id="name" name="name" required>
+
+                <label for="date">Date:</label>
+                <input type="date" id="date" name="date" required>
+
+                <label for="time">Time:</label>
+                <input type="time" id="time" name="time" required>
+
+                <label for="location">Location:</label>
+                <input type="text" id="location" name="location" required>
+
+                <label for="description">Description:</label>
+                <textarea id="description" name="description" required></textarea>
+
+                <button type="submit">Create Event</button>
+            </form>
+        </section>
+    </main>
+    <script src="/static/js/main.js"></script>
+</body>
+</html>
